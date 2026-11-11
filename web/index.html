@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transporte Social — Marialva/PR</title>
+  <link rel="stylesheet" href="css/estilo.css" />
+</head>
+<body>
+
+<!-- =========================================================
+     TELA DE LOGIN
+     ========================================================= -->
+<div id="tela-login" class="tela">
+  <div class="login-wrapper">
+    <div class="login-logo">
+      <span class="logo-icon">🚐</span>
+      <h1>Transporte Social</h1>
+      <p>Prefeitura de Marialva — PR</p>
+    </div>
+
+    <div class="card login-card">
+      <h2>Entrar no sistema</h2>
+      <form id="form-login">
+        <div class="campo">
+          <label for="login-email">E-mail</label>
+          <input id="login-email" type="email" placeholder="seu@email.com" required />
+        </div>
+        <div class="campo">
+          <label for="login-senha">Senha</label>
+          <input id="login-senha" type="password" placeholder="••••••" required />
+        </div>
+        <div id="login-erro" class="alerta alerta-erro hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+      <hr />
+      <p class="texto-centro">Não tem conta?
+        <a href="#" onclick="mostrarCadastro()">Cadastre-se aqui</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     TELA DE CADASTRO
+     ========================================================= -->
+<div id="tela-cadastro" class="tela hidden">
+  <div class="login-wrapper">
+    <div class="login-logo">
+      <span class="logo-icon">🚐</span>
+      <h1>Transporte Social</h1>
+      <p>Novo cadastro</p>
+    </div>
+
+    <div class="card login-card">
+      <h2>Criar conta</h2>
+      <form id="form-cadastro">
+        <div class="campo">
+          <label>Tipo de usuário</label>
+          <div class="radio-group">
+            <label><input type="radio" name="tipo-cad" value="CIDADAO" checked /> Cidadão</label>
+            <label><input type="radio" name="tipo-cad" value="MOTORISTA" /> Motorista</label>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="cad-nome">Nome completo</label>
+          <input id="cad-nome" type="text" placeholder="João da Silva" required />
+        </div>
+        <div class="grid-2">
+          <div class="campo">
+            <label for="cad-cpf">CPF</label>
+            <input id="cad-cpf" type="text" placeholder="000.000.000-00" required />
+          </div>
+          <div class="campo">
+            <label for="cad-nascimento">Data de nascimento</label>
+            <input id="cad-nascimento" type="date" required />
+          </div>
+        </div>
+        <div class="campo">
+          <label for="cad-email">E-mail</label>
+          <input id="cad-email" type="email" placeholder="joao@email.com" required />
+        </div>
+        <div class="campo">
+          <label for="cad-telefone">Telefone</label>
+          <input id="cad-telefone" type="text" placeholder="(44) 99999-9999" />
+        </div>
+        <div class="campo">
+          <label for="cad-senha">Senha (mín. 6 caracteres)</label>
+          <input id="cad-senha" type="password" placeholder="••••••" required minlength="6" />
+        </div>
+
+        <!-- Campos só para Cidadão -->
+        <div id="campos-cidadao">
+          <div class="grid-2">
+            <div class="campo">
+              <label for="cad-renda">Renda familiar (R$)</label>
+              <input id="cad-renda" type="number" step="0.01" placeholder="1500.00" />
+            </div>
+            <div class="campo">
+              <label for="cad-nis">NIS (opcional)</label>
+              <input id="cad-nis" type="text" placeholder="000.00000.00-0" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Campos só para Motorista -->
+        <div id="campos-motorista" class="hidden">
+          <div class="campo">
+            <label for="cad-cnh">CNH</label>
+            <input id="cad-cnh" type="text" placeholder="00000000000" />
+          </div>
+        </div>
+
+        <div id="cad-erro" class="alerta alerta-erro hidden"></div>
+        <div id="cad-ok" class="alerta alerta-ok hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block">Cadastrar</button>
+      </form>
+      <hr />
+      <p class="texto-centro">Já tem conta?
+        <a href="#" onclick="mostrarLogin()">Entrar</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     APP PRINCIPAL (após login)
+     ========================================================= -->
+<div id="tela-app" class="tela hidden">
+
+  <!-- Barra de navegação -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <span>🚐</span> Transporte Social
+    </div>
+    <div class="navbar-usuario">
+      <span id="nav-nome"></span>
+      <span id="nav-badge" class="badge"></span>
+      <button class="btn btn-outline btn-sm" onclick="fazerLogout()">Sair</button>
+    </div>
+  </nav>
+
+  <!-- Conteúdo por perfil -->
+  <main class="container">
+
+    <!-- ===================== PAINEL DO CIDADÃO ===================== -->
+    <div id="painel-cidadao" class="hidden">
+
+      <!-- Resumo de limite semanal -->
+      <div class="stats-row" id="stats-cidadao">
+        <div class="stat-card">
+          <div class="stat-valor" id="stat-usadas">-</div>
+          <div class="stat-label">Viagens esta semana</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-valor" id="stat-restantes">-</div>
+          <div class="stat-label">Viagens restantes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-valor">5</div>
+          <div class="stat-label">Limite semanal</div>
+        </div>
+      </div>
+
+      <!-- Solicitar viagem -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🗺️ Solicitar viagem</h3>
+        </div>
+        <form id="form-solicitar">
+          <div class="grid-2">
+            <div class="campo">
+              <label for="sol-origem">Origem</label>
+              <input id="sol-origem" type="text" placeholder="Rua das Flores, 100" required />
+            </div>
+            <div class="campo">
+              <label for="sol-destino">Destino</label>
+              <input id="sol-destino" type="text" placeholder="Hospital Municipal" required />
+            </div>
+          </div>
+          <div class="campo">
+            <label for="sol-km">Distância estimada (km)</label>
+            <input id="sol-km" type="number" step="0.1" min="0.1" placeholder="5.5" required />
+          </div>
+          <div id="sol-preview" class="hidden preview-valores">
+            <span>Total: <strong id="sol-total"></strong></span>
+            <span>Subsídio: <strong id="sol-subsidio"></strong></span>
+            <span>Você paga: <strong id="sol-paga" class="destaque"></strong></span>
+          </div>
+          <div id="sol-erro" class="alerta alerta-erro hidden"></div>
+          <div class="campo-acoes">
+            <button type="button" class="btn btn-secondary" onclick="calcularPreview()">Calcular</button>
+            <button type="submit" class="btn btn-primary">Solicitar viagem</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Minhas viagens -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🧾 Minhas viagens</h3>
+          <button class="btn btn-outline btn-sm" onclick="carregarViagensCidadao()">↻ Atualizar</button>
+        </div>
+        <div id="lista-viagens-cidadao" class="lista-viagens">
+          <p class="vazio">Carregando...</p>
+        </div>
+      </div>
+
+    </div><!-- /painel-cidadao -->
+
+    <!-- ===================== PAINEL DO MOTORISTA ===================== -->
+    <div id="painel-motorista" class="hidden">
+
+      <!-- Disponibilidade -->
+      <div class="card card-horizontal">
+        <div>
+          <h3>Minha disponibilidade</h3>
+          <p id="txt-disponivel" class="subtexto"></p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="chk-disponivel" onchange="alterarDisponibilidade(this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Meu veículo -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🚗 Meu veículo</h3>
+          <button class="btn btn-outline btn-sm" onclick="abrirModalVeiculo()">+ Adicionar</button>
+        </div>
+        <div id="lista-veiculos" class="lista-simples">
+          <p class="vazio">Nenhum veículo cadastrado.</p>
+        </div>
+      </div>
+
+      <!-- Solicitações abertas -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Solicitações disponíveis</h3>
+          <button class="btn btn-outline btn-sm" onclick="carregarSolicitacoes()">↻ Atualizar</button>
+        </div>
+        <div id="lista-solicitacoes" class="lista-viagens">
+          <p class="vazio">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- Minhas corridas -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🧾 Minhas corridas</h3>
+          <button class="btn btn-outline btn-sm" onclick="carregarViagensMotorista()">↻ Atualizar</button>
+        </div>
+        <div id="lista-viagens-motorista" class="lista-viagens">
+          <p class="vazio">Nenhuma corrida ainda.</p>
+        </div>
+      </div>
+
+    </div><!-- /painel-motorista -->
+
+    <!-- ===================== PAINEL DO ADMINISTRADOR ===================== -->
+    <div id="painel-admin" class="hidden">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab ativo" onclick="mudarTab('tab-pendentes', this)">⏳ Pendentes</button>
+        <button class="tab" onclick="mudarTab('tab-cidadaos', this)">👤 Cidadãos</button>
+        <button class="tab" onclick="mudarTab('tab-motoristas', this)">🚗 Motoristas</button>
+        <button class="tab" onclick="mudarTab('tab-viagens-admin', this)">🗺️ Viagens</button>
+      </div>
+
+      <!-- Pendentes de aprovação -->
+      <div id="tab-pendentes" class="tab-conteudo">
+        <div class="card">
+          <div class="card-header">
+            <h3>Cadastros pendentes de aprovação</h3>
+            <button class="btn btn-outline btn-sm" onclick="carregarPendentes()">↻ Atualizar</button>
+          </div>
+          <div id="lista-pendentes">
+            <p class="vazio">Carregando...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cidadãos -->
+      <div id="tab-cidadaos" class="tab-conteudo hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>Cidadãos aprovados</h3>
+            <button class="btn btn-outline btn-sm" onclick="carregarCidadaos()">↻ Atualizar</button>
+          </div>
+          <div id="lista-cidadaos">
+            <p class="vazio">Carregando...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Motoristas -->
+      <div id="tab-motoristas" class="tab-conteudo hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>Motoristas aprovados</h3>
+            <button class="btn btn-outline btn-sm" onclick="carregarMotoristas()">↻ Atualizar</button>
+          </div>
+          <div id="lista-motoristas">
+            <p class="vazio">Carregando...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Todas as viagens -->
+      <div id="tab-viagens-admin" class="tab-conteudo hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>Todas as viagens (solicitadas/em andamento)</h3>
+            <button class="btn btn-outline btn-sm" onclick="carregarViagensAdmin()">↻ Atualizar</button>
+          </div>
+          <div id="lista-viagens-admin">
+            <p class="vazio">Carregando...</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /painel-admin -->
+
+  </main>
+</div><!-- /tela-app -->
+
+<!-- =========================================================
+     MODAL GENÉRICO
+     ========================================================= -->
+<div id="modal-backdrop" class="modal-backdrop hidden" onclick="fecharModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-titulo"></h3>
+      <button class="modal-fechar" onclick="fecharModal()">✕</button>
+    </div>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
