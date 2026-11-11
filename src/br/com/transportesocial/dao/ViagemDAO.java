@@ -1,154 +1,132 @@
 package br.com.transportesocial.dao;
 
+import br.com.transportesocial.model.Cidadao;
+import br.com.transportesocial.model.Motorista;
 import br.com.transportesocial.model.StatusViagem;
 import br.com.transportesocial.model.Viagem;
 import br.com.transportesocial.util.Conexao;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
+import java.sql.Types;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Persistencia das viagens e a contagem do limite semanal (RN05). */
+/** Persistencia da tabela viagem. */
 public class ViagemDAO {
 
     private static final String SELECT_BASE =
-            "SELECT v.*, uc.nome AS nome_cidadao, um.nome AS nome_motorista, "
-          + "(SELECT COUNT(*) FROM pagamento p WHERE p.viagem_id = v.id) AS qtd_pagamento "
-          + "FROM viagem v "
-          + "JOIN usuario uc       ON uc.id = v.cidadao_id "
-          + "LEFT JOIN usuario um  ON um.id = v.motorista_id ";
+            "SELECT v.*, uc.nome AS cidadao_nome, um.nome AS motorista_nome, "
+            + "p.id AS pg_id, p.valor AS pg_valor, p.forma AS pg_forma, "
+            + "p.aprovado AS pg_aprovado, p.data_pagamento AS pg_data "
+            + "FROM viagem v "
+            + "JOIN usuario uc ON uc.id = v.cidadao_id "
+            + "LEFT JOIN usuario um ON um.id = v.motorista_id "
+            + "LEFT JOIN pagamento p ON p.viagem_id = v.id ";
 
-    public long inserir(Viagem viagem) throws SQLException {
+    /** RF07: grava a solicitacao com os valores calculados (RF08). */
+    public void inserir(Viagem v) throws SQLException {
+        String sql = "INSERT INTO viagem (cidadao_id, motorista_id, origem, destino, distancia_km, valor_total, "
+                + "valor_subsidio, valor_cidadao, qtd_acompanhantes, data_hora, status) "
+                + "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "INSERT INTO viagem (cidadao_id, origem, destino, distancia_km, valor_total, "
-                   + "valor_subsidio, valor_cidadao, data_hora, status) "
-                   + "VALUES (?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS)) {
-            ps.setLong(1, viagem.getCidadaoId());
-            ps.setString(2, viagem.getOrigem());
-            ps.setString(3, viagem.getDestino());
-            ps.setBigDecimal(4, viagem.getDistanciaKm());
-            ps.setBigDecimal(5, viagem.getValorTotal());
-            ps.setBigDecimal(6, viagem.getValorSubsidio());
-            ps.setBigDecimal(7, viagem.getValorCidadao());
-            ps.setTimestamp(8, Timestamp.valueOf(viagem.getDataHora()));
-            ps.setString(9, viagem.getStatus().name());
+             PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, v.getCidadao().getId());
+            ps.setString(2, v.getOrigem());
+            ps.setString(3, v.getDestino());
+            ps.setBigDecimal(4, BigDecimal.valueOf(v.getDistanciaKm()));
+            ps.setBigDecimal(5, v.getValorTotal());
+            ps.setBigDecimal(6, v.getValorSubsidio());
+            ps.setBigDecimal(7, v.getValorCidadao());
+            ps.setInt(8, v.getQtdAcompanhantes());
+            ps.setTimestamp(9, Timestamp.valueOf(v.getDataHora()));
+            ps.setString(10, v.getStatus().name());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
-                rs.next();
-                viagem.setId(rs.getLong(1));
+                if (rs.next()) {
+                    v.setId(rs.getInt(1));
+                }
             }
         }
-        return viagem.getId();
-    }
-
-    public Viagem buscarPorId(long id) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(SELECT_BASE + "WHERE v.id = ?")) {
-            ps.setLong(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? montar(rs) : null;
-            }
-        }
-    }
-
-    public List<Viagem> listarPorCidadao(long cidadaoId) throws SQLException {
-        return consultar(SELECT_BASE + "WHERE v.cidadao_id = ? ORDER BY v.data_hora DESC", cidadaoId);
-    }
-
-    public List<Viagem> listarPorMotorista(long motoristaId) throws SQLException {
-        return consultar(SELECT_BASE + "WHERE v.motorista_id = ? ORDER BY v.data_hora DESC", motoristaId);
-    }
-
-    /** Solicitacoes ainda sem motorista, mostradas para quem esta disponivel (RF09). */
-    public List<Viagem> listarSolicitacoesAbertas() throws SQLException {
-        return consultar(SELECT_BASE + "WHERE v.status = 'SOLICITADA' AND v.motorista_id IS NULL "
-                + "ORDER BY v.data_hora", null);
-    }
-
-    public List<Viagem> listarPorPeriodo(LocalDate inicio, LocalDate fim) throws SQLException {
-        List<Viagem> lista = new ArrayList<>();
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(SELECT_BASE
-                     + "WHERE v.data_hora BETWEEN ? AND ? ORDER BY v.data_hora")) {
-            ps.setTimestamp(1, Timestamp.valueOf(inicio.atStartOfDay()));
-            ps.setTimestamp(2, Timestamp.valueOf(fim.atTime(LocalTime.MAX)));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) lista.add(montar(rs));
-            }
-        }
-        return lista;
     }
 
     /**
-     * Conta as viagens concluidas do cidadao na semana atual (segunda a domingo).
+     * Grava a mudanca de status (e o motorista/valores) somente se a viagem
+     * ainda estiver no status esperado. Evita que dois motoristas aceitem a
+     * mesma solicitacao ao mesmo tempo.
      */
-    public int contarConcluidasNaSemana(long cidadaoId) throws SQLException {
-        LocalDate hoje = LocalDate.now();
-        LocalDate segunda = hoje.with(DayOfWeek.MONDAY);
-        LocalDate domingo = hoje.with(DayOfWeek.SUNDAY);
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "SELECT COUNT(*) FROM viagem WHERE cidadao_id = ? AND status = 'CONCLUIDA' "
-                   + "AND data_hora BETWEEN ? AND ?")) {
-            ps.setLong(1, cidadaoId);
-            ps.setTimestamp(2, Timestamp.valueOf(segunda.atStartOfDay()));
-            ps.setTimestamp(3, Timestamp.valueOf(domingo.atTime(LocalTime.MAX)));
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
+    public boolean atualizar(Viagem v, StatusViagem statusEsperado) throws SQLException {
+        String sql = "UPDATE viagem SET status = ?, motorista_id = ?, valor_subsidio = ?, valor_cidadao = ? "
+                + "WHERE id = ? AND status = ?";
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, v.getStatus().name());
+            if (v.getMotorista() == null) {
+                ps.setNull(2, Types.INTEGER);
+            } else {
+                ps.setInt(2, v.getMotorista().getId());
             }
+            ps.setBigDecimal(3, v.getValorSubsidio());
+            ps.setBigDecimal(4, v.getValorCidadao());
+            ps.setInt(5, v.getId());
+            ps.setString(6, statusEsperado.name());
+            return ps.executeUpdate() == 1;
         }
     }
 
-    public void definirMotorista(long viagemId, long motoristaId) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE viagem SET motorista_id = ?, status = 'ACEITA' "
-                   + "WHERE id = ? AND status = 'SOLICITADA'")) {
-            ps.setLong(1, motoristaId);
-            ps.setLong(2, viagemId);
-            ps.executeUpdate();
-        }
-    }
-
-    public void alterarStatus(long viagemId, StatusViagem status) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE viagem SET status = ? WHERE id = ?")) {
-            ps.setString(1, status.name());
-            ps.setLong(2, viagemId);
-            ps.executeUpdate();
-        }
-    }
-
-    /** Cancela a solicitacao que ninguem aceitou em 10 minutos (RN09). */
-    public int cancelarSolicitacoesExpiradas() throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE viagem SET status = 'CANCELADA' "
-                   + "WHERE status = 'SOLICITADA' AND data_hora < ?")) {
-            ps.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now().minusMinutes(10)));
+    /** RN09: cancela as solicitacoes que ninguem aceitou dentro do prazo. */
+    public int cancelarSolicitacoesExpiradas(LocalDateTime limite) throws SQLException {
+        String sql = "UPDATE viagem SET status = 'CANCELADA', valor_subsidio = 0, valor_cidadao = 0 "
+                + "WHERE status = 'SOLICITADA' AND data_hora < ?";
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setTimestamp(1, Timestamp.valueOf(limite));
             return ps.executeUpdate();
         }
     }
 
-    private List<Viagem> consultar(String sql, Long parametro) throws SQLException {
+    public Viagem buscarPorId(int id) throws SQLException {
+        List<Viagem> lista = listar("WHERE v.id = ?", id);
+        return lista.isEmpty() ? null : lista.get(0);
+    }
+
+    /** RF13: historico do cidadao. */
+    public List<Viagem> listarPorCidadao(int cidadaoId) throws SQLException {
+        return listar("WHERE v.cidadao_id = ? ORDER BY v.data_hora DESC, v.id DESC", cidadaoId);
+    }
+
+    /** RF13: historico do motorista. */
+    public List<Viagem> listarPorMotorista(int motoristaId) throws SQLException {
+        return listar("WHERE v.motorista_id = ? ORDER BY v.data_hora DESC, v.id DESC", motoristaId);
+    }
+
+    /** RF09: solicitacoes em aberto, as mais antigas primeiro. */
+    public List<Viagem> listarAbertas() throws SQLException {
+        return listar("WHERE v.status = 'SOLICITADA' ORDER BY v.data_hora, v.id");
+    }
+
+    /** RF14: viagens realizadas (concluidas) no periodo [inicio, fim). */
+    public List<Viagem> listarConcluidasNoPeriodo(LocalDateTime inicio, LocalDateTime fim) throws SQLException {
+        return listar("WHERE v.status = 'CONCLUIDA' AND v.data_hora >= ? AND v.data_hora < ? "
+                + "ORDER BY v.data_hora, v.id", Timestamp.valueOf(inicio), Timestamp.valueOf(fim));
+    }
+
+    // ------------------------------------------------------------------
+
+    private List<Viagem> listar(String filtro, Object... parametros) throws SQLException {
         List<Viagem> lista = new ArrayList<>();
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            if (parametro != null) ps.setLong(1, parametro);
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(SELECT_BASE + filtro)) {
+            for (int i = 0; i < parametros.length; i++) {
+                ps.setObject(i + 1, parametros[i]);
+            }
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) lista.add(montar(rs));
+                while (rs.next()) {
+                    lista.add(montar(rs));
+                }
             }
         }
         return lista;
@@ -156,22 +134,30 @@ public class ViagemDAO {
 
     private Viagem montar(ResultSet rs) throws SQLException {
         Viagem v = new Viagem();
-        v.setId(rs.getLong("id"));
-        v.setCidadaoId(rs.getLong("cidadao_id"));
-        long motorista = rs.getLong("motorista_id");
-        v.setMotoristaId(rs.wasNull() ? null : motorista);
+        v.setId(rs.getInt("id"));
         v.setOrigem(rs.getString("origem"));
         v.setDestino(rs.getString("destino"));
-        v.setDistanciaKm(rs.getBigDecimal("distancia_km"));
+        v.setDistanciaKm(rs.getBigDecimal("distancia_km").doubleValue());
         v.setValorTotal(rs.getBigDecimal("valor_total"));
         v.setValorSubsidio(rs.getBigDecimal("valor_subsidio"));
         v.setValorCidadao(rs.getBigDecimal("valor_cidadao"));
-        Timestamp ts = rs.getTimestamp("data_hora");
-        if (ts != null) v.setDataHora(ts.toLocalDateTime());
+        v.setQtdAcompanhantes(rs.getInt("qtd_acompanhantes"));
+        v.setDataHora(rs.getTimestamp("data_hora").toLocalDateTime());
         v.setStatus(StatusViagem.valueOf(rs.getString("status")));
-        v.setNomeCidadao(rs.getString("nome_cidadao"));
-        v.setNomeMotorista(rs.getString("nome_motorista"));
-        v.setPago(rs.getInt("qtd_pagamento") > 0);
+
+        Cidadao c = new Cidadao();
+        c.setId(rs.getInt("cidadao_id"));
+        c.setNome(rs.getString("cidadao_nome"));
+        v.setCidadao(c);
+
+        int motoristaId = rs.getInt("motorista_id");
+        if (!rs.wasNull()) {
+            Motorista m = new Motorista();
+            m.setId(motoristaId);
+            m.setNome(rs.getString("motorista_nome"));
+            v.setMotorista(m);
+        }
+        v.setPagamento(PagamentoDAO.montar(rs));
         return v;
     }
 }

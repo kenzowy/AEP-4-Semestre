@@ -2,29 +2,25 @@ package br.com.transportesocial.model;
 
 import java.time.LocalDateTime;
 
-/** Documento enviado pelo usuario na hora do cadastro (RF02). */
+/** Documento enviado no cadastro (RF02). Pertence a um Usuario (composicao). */
 public class Documento {
 
     private int id;
-    private int usuarioId;
     private TipoDocumento tipo;
     private String arquivo;
-    private LocalDateTime dataEnvio = LocalDateTime.now();
+    private LocalDateTime dataEnvio;
 
     public Documento() {
     }
 
-    public Documento(int usuarioId, TipoDocumento tipo, String arquivo) {
-        this.usuarioId = usuarioId;
+    public Documento(TipoDocumento tipo, String arquivo) {
         this.tipo = tipo;
         this.arquivo = arquivo;
+        this.dataEnvio = LocalDateTime.now();
     }
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
-    public int getUsuarioId() { return usuarioId; }
-    public void setUsuarioId(int usuarioId) { this.usuarioId = usuarioId; }
 
     public TipoDocumento getTipo() { return tipo; }
     public void setTipo(TipoDocumento tipo) { this.tipo = tipo; }

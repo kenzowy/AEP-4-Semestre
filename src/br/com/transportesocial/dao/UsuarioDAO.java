@@ -2,244 +2,236 @@ package br.com.transportesocial.dao;
 
 import br.com.transportesocial.model.Administrador;
 import br.com.transportesocial.model.Cidadao;
+import br.com.transportesocial.model.Documento;
 import br.com.transportesocial.model.Motorista;
+import br.com.transportesocial.model.RegraNegocioException;
 import br.com.transportesocial.model.StatusCadastro;
 import br.com.transportesocial.model.Usuario;
+import br.com.transportesocial.model.Veiculo;
 import br.com.transportesocial.util.Conexao;
-import br.com.transportesocial.util.Senha;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * CRUD da entidade principal do sistema (usuario e suas especializacoes).
+ * Persistencia dos usuarios. A heranca e gravada em duas tabelas:
+ * usuario (dados comuns) + cidadao ou motorista (dados especificos).
  */
 public class UsuarioDAO {
 
     private static final String SELECT_BASE =
-            "SELECT u.*, c.renda_familiar, c.nis, m.cnh, m.disponivel "
-          + "FROM usuario u "
-          + "LEFT JOIN cidadao c   ON c.usuario_id = u.id "
-          + "LEFT JOIN motorista m ON m.usuario_id = u.id ";
+            "SELECT u.*, c.renda_familiar, c.nis, m.cnh, m.disponivel FROM usuario u "
+            + "LEFT JOIN cidadao c ON c.usuario_id = u.id "
+            + "LEFT JOIN motorista m ON m.usuario_id = u.id ";
 
-    // ------------------------------------------------------------------ CREATE
-    public long inserir(Usuario usuario) throws SQLException {
-        String sqlUsuario = "INSERT INTO usuario "
-                + "(nome, cpf, data_nascimento, email, telefone, senha, tipo, status) "
-                + "VALUES (?,?,?,?,?,?,?,?)";
+    private final DocumentoDAO documentoDAO = new DocumentoDAO();
+    private final VeiculoDAO veiculoDAO = new VeiculoDAO();
+
+    /** RF01 + RF02: grava o usuario, seus documentos e (motorista) seus veiculos numa transacao. */
+    public void inserir(Usuario u) throws SQLException {
         try (Connection con = Conexao.abrir()) {
             con.setAutoCommit(false);
-            long id;
-            try (PreparedStatement ps = con.prepareStatement(sqlUsuario, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, usuario.getNome());
-                ps.setString(2, usuario.getCpf());
-                ps.setDate(3, Date.valueOf(usuario.getDataNascimento()));
-                ps.setString(4, usuario.getEmail());
-                ps.setString(5, usuario.getTelefone());
-                ps.setString(6, Senha.gerarHash(usuario.getSenha()));
-                ps.setString(7, usuario.getTipo());
-                ps.setString(8, usuario.getStatus().name());
-                ps.executeUpdate();
-                try (ResultSet rs = ps.getGeneratedKeys()) {
-                    rs.next();
-                    id = rs.getLong(1);
-                }
-            }
-            if (usuario instanceof Cidadao cidadao) {
-                try (PreparedStatement ps = con.prepareStatement(
-                        "INSERT INTO cidadao (usuario_id, renda_familiar, nis) VALUES (?,?,?)")) {
-                    ps.setLong(1, id);
-                    ps.setBigDecimal(2, cidadao.getRendaFamiliar());
-                    ps.setString(3, cidadao.getNis());
+            try {
+                String sql = "INSERT INTO usuario (nome, cpf, data_nascimento, email, telefone, senha, tipo, status) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, u.getNome());
+                    ps.setString(2, u.getCpf());
+                    ps.setDate(3, Date.valueOf(u.getDataNascimento()));
+                    ps.setString(4, u.getEmail());
+                    ps.setString(5, u.getTelefone());
+                    ps.setString(6, u.getSenha());
+                    ps.setString(7, u.getTipo());
+                    ps.setString(8, u.getStatus().name());
                     ps.executeUpdate();
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
+                        rs.next();
+                        u.setId(rs.getInt(1));
+                    }
                 }
-            } else if (usuario instanceof Motorista motorista) {
-                try (PreparedStatement ps = con.prepareStatement(
-                        "INSERT INTO motorista (usuario_id, cnh, disponivel) VALUES (?,?,0)")) {
-                    ps.setLong(1, id);
-                    ps.setString(2, motorista.getCnh());
-                    ps.executeUpdate();
+                if (u instanceof Cidadao c) {
+                    try (PreparedStatement ps = con.prepareStatement(
+                            "INSERT INTO cidadao (usuario_id, renda_familiar, nis) VALUES (?, ?, ?)")) {
+                        ps.setInt(1, c.getId());
+                        ps.setBigDecimal(2, c.getRendaFamiliar());
+                        ps.setString(3, c.getNis());
+                        ps.executeUpdate();
+                    }
+                } else if (u instanceof Motorista m) {
+                    try (PreparedStatement ps = con.prepareStatement(
+                            "INSERT INTO motorista (usuario_id, cnh, disponivel) VALUES (?, ?, ?)")) {
+                        ps.setInt(1, m.getId());
+                        ps.setString(2, m.getCnh());
+                        ps.setBoolean(3, m.isDisponivel());
+                        ps.executeUpdate();
+                    }
+                    for (Veiculo v : m.getVeiculos()) {
+                        veiculoDAO.inserir(con, m.getId(), v);
+                    }
                 }
-            }
-            con.commit();
-            usuario.setId(id);
-            return id;
-        }
-    }
-
-    // -------------------------------------------------------------------- READ
-    public Usuario buscarPorId(long id) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(SELECT_BASE + "WHERE u.id = ?")) {
-            ps.setLong(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? montar(rs) : null;
+                for (Documento d : u.getDocumentos()) {
+                    documentoDAO.inserir(con, u.getId(), d);
+                }
+                con.commit();
+            } catch (SQLIntegrityConstraintViolationException e) {
+                con.rollback();
+                throw new RegraNegocioException("Ja existe um cadastro com este CPF.");
+            } catch (SQLException | RuntimeException e) {
+                con.rollback();
+                throw e;
             }
         }
     }
 
-    public Usuario buscarPorEmail(String email) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(SELECT_BASE + "WHERE u.email = ?")) {
-            ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? montar(rs) : null;
-            }
-        }
+    public Usuario buscarPorId(int id) throws SQLException {
+        return buscarUm(SELECT_BASE + "WHERE u.id = ?", String.valueOf(id));
     }
 
-    public List<Usuario> listar(String tipo, String status) throws SQLException {
-        StringBuilder sql = new StringBuilder(SELECT_BASE + "WHERE 1 = 1 ");
-        if (tipo != null && !tipo.isBlank()) {
-            sql.append("AND u.tipo = ? ");
+    public Usuario buscarPorCpf(String cpf) throws SQLException {
+        return buscarUm(SELECT_BASE + "WHERE u.cpf = ?", Usuario.formatarCpf(cpf));
+    }
+
+    /** RF01 (consultar) e RF03 (pendentes): lista com filtros opcionais. */
+    public List<Usuario> listar(String tipo, StatusCadastro status) throws SQLException {
+        StringBuilder sql = new StringBuilder(SELECT_BASE + "WHERE u.tipo <> 'ADMIN'");
+        if (tipo != null) {
+            sql.append(" AND u.tipo = ?");
         }
-        if (status != null && !status.isBlank()) {
-            sql.append("AND u.status = ? ");
+        if (status != null) {
+            sql.append(" AND u.status = ?");
         }
-        sql.append("ORDER BY u.nome");
+        sql.append(" ORDER BY u.nome");
         List<Usuario> lista = new ArrayList<>();
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql.toString())) {
             int i = 1;
-            if (tipo != null && !tipo.isBlank()) {
+            if (tipo != null) {
                 ps.setString(i++, tipo);
             }
-            if (status != null && !status.isBlank()) {
-                ps.setString(i, status);
+            if (status != null) {
+                ps.setString(i, status.name());
             }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     lista.add(montar(rs));
                 }
             }
+            for (Usuario u : lista) {
+                completar(con, u);
+            }
         }
         return lista;
     }
 
-    public boolean existeCpfOuEmail(String cpf, String email) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "SELECT 1 FROM usuario WHERE cpf = ? OR email = ?")) {
-            ps.setString(1, cpf);
-            ps.setString(2, email);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------ UPDATE
-    public void atualizar(Usuario usuario) throws SQLException {
-        try (Connection con = Conexao.abrir()) {
-            con.setAutoCommit(false);
-            try (PreparedStatement ps = con.prepareStatement(
-                    "UPDATE usuario SET nome = ?, telefone = ?, email = ? WHERE id = ?")) {
-                ps.setString(1, usuario.getNome());
-                ps.setString(2, usuario.getTelefone());
-                ps.setString(3, usuario.getEmail());
-                ps.setLong(4, usuario.getId());
-                ps.executeUpdate();
-            }
-            if (usuario instanceof Cidadao cidadao) {
-                try (PreparedStatement ps = con.prepareStatement(
-                        "UPDATE cidadao SET renda_familiar = ?, nis = ? WHERE usuario_id = ?")) {
-                    ps.setBigDecimal(1, cidadao.getRendaFamiliar());
-                    ps.setString(2, cidadao.getNis());
-                    ps.setLong(3, usuario.getId());
-                    ps.executeUpdate();
-                }
-            } else if (usuario instanceof Motorista motorista) {
-                try (PreparedStatement ps = con.prepareStatement(
-                        "UPDATE motorista SET cnh = ? WHERE usuario_id = ?")) {
-                    ps.setString(1, motorista.getCnh());
-                    ps.setLong(2, usuario.getId());
-                    ps.executeUpdate();
-                }
-            }
-            con.commit();
-        }
-    }
-
-    /** Aprovacao ou recusa feita pelo administrador (RF03 / RN04). */
-    public void alterarStatus(long id, StatusCadastro status, String motivo) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE usuario SET status = ?, motivo_recusa = ? WHERE id = ?")) {
-            ps.setString(1, status.name());
-            ps.setString(2, motivo);
-            ps.setLong(3, id);
+    /** RF01 (alterar): dados da conta e, se trocada, a senha. */
+    public void atualizar(Usuario u) throws SQLException {
+        String sql = "UPDATE usuario SET nome = ?, email = ?, telefone = ?, senha = ? WHERE id = ?";
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, u.getNome());
+            ps.setString(2, u.getEmail());
+            ps.setString(3, u.getTelefone());
+            ps.setString(4, u.getSenha());
+            ps.setInt(5, u.getId());
             ps.executeUpdate();
         }
     }
 
-    public void alterarDisponibilidade(long motoristaId, boolean disponivel) throws SQLException {
-        try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE motorista SET disponivel = ? WHERE usuario_id = ?")) {
-            ps.setBoolean(1, disponivel);
-            ps.setLong(2, motoristaId);
+    /** RF03 / RN04: grava a aprovacao, a recusa ou a volta para analise. */
+    public void atualizarStatus(Usuario u) throws SQLException {
+        String sql = "UPDATE usuario SET status = ?, motivo_recusa = ? WHERE id = ?";
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, u.getStatus().name());
+            ps.setString(2, u.getMotivoRecusa());
+            ps.setInt(3, u.getId());
             ps.executeUpdate();
         }
     }
 
-    // ------------------------------------------------------------------ DELETE
-    public void excluir(long id) throws SQLException {
+    /** RF06: disponibilidade do motorista. */
+    public void atualizarDisponibilidade(Motorista m) throws SQLException {
         try (Connection con = Conexao.abrir();
-             PreparedStatement ps = con.prepareStatement("DELETE FROM usuario WHERE id = ?")) {
-            ps.setLong(1, id);
+             PreparedStatement ps = con.prepareStatement("UPDATE motorista SET disponivel = ? WHERE usuario_id = ?")) {
+            ps.setBoolean(1, m.isDisponivel());
+            ps.setInt(2, m.getId());
             ps.executeUpdate();
         }
-    }
-
-    // ------------------------------------------------------------------- LOGIN
-    public Usuario autenticar(String email, String senha) throws SQLException {
-        Usuario usuario = buscarPorEmail(email);
-        if (usuario == null || !Senha.conferir(senha, usuario.getSenha())) {
-            return null;
-        }
-        return usuario;
     }
 
     /**
-     * Transforma a linha do banco no objeto da subclasse correta.
-     * E aqui que a heranca do modelo se encontra com a heranca das tabelas.
+     * RF01 (excluir). Documentos e veiculos saem junto (ON DELETE CASCADE).
+     * Quem ja tem viagens registradas nao pode ser excluido, para nao perder
+     * o historico de subsidios pagos pela prefeitura.
      */
+    public void excluir(int id) throws SQLException {
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement("DELETE FROM usuario WHERE id = ?")) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        } catch (SQLIntegrityConstraintViolationException e) {
+            throw new RegraNegocioException(
+                    "Esta conta possui viagens registradas e nao pode ser excluida (historico de subsidios).");
+        }
+    }
+
+    // ------------------------------------------------------------------
+
+    private Usuario buscarUm(String sql, String parametro) throws SQLException {
+        try (Connection con = Conexao.abrir(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, parametro);
+            Usuario u = null;
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    u = montar(rs);
+                }
+            }
+            if (u != null) {
+                completar(con, u);
+            }
+            return u;
+        }
+    }
+
+    /** Carrega as composicoes: documentos e, no motorista, os veiculos. */
+    private void completar(Connection con, Usuario u) throws SQLException {
+        u.carregarDocumentos(documentoDAO.listarPorUsuario(con, u.getId()));
+        if (u instanceof Motorista m) {
+            m.carregarVeiculos(veiculoDAO.listarPorMotorista(con, m.getId()));
+        }
+    }
+
+    /** Cria o objeto da subclasse certa conforme a coluna tipo. */
     private Usuario montar(ResultSet rs) throws SQLException {
-        String tipo = rs.getString("tipo");
-        Usuario usuario;
-        if ("CIDADAO".equals(tipo)) {
-            Cidadao cidadao = new Cidadao();
-            BigDecimal renda = rs.getBigDecimal("renda_familiar");
-            cidadao.setRendaFamiliar(renda == null ? BigDecimal.ZERO : renda);
-            cidadao.setNis(rs.getString("nis"));
-            usuario = cidadao;
-        } else if ("MOTORISTA".equals(tipo)) {
-            Motorista motorista = new Motorista();
-            motorista.setCnh(rs.getString("cnh"));
-            motorista.setDisponivel(rs.getBoolean("disponivel"));
-            usuario = motorista;
-        } else {
-            usuario = new Administrador();
+        Usuario u;
+        switch (rs.getString("tipo")) {
+            case "CIDADAO" -> {
+                Cidadao c = new Cidadao();
+                c.setRendaFamiliar(rs.getBigDecimal("renda_familiar"));
+                c.setNis(rs.getString("nis"));
+                u = c;
+            }
+            case "MOTORISTA" -> {
+                Motorista m = new Motorista();
+                m.setCnh(rs.getString("cnh"));
+                m.setDisponivel(rs.getBoolean("disponivel"));
+                u = m;
+            }
+            default -> u = new Administrador();
         }
-        usuario.setId(rs.getLong("id"));
-        usuario.setNome(rs.getString("nome"));
-        usuario.setCpf(rs.getString("cpf"));
-        Date nascimento = rs.getDate("data_nascimento");
-        if (nascimento != null) {
-            usuario.setDataNascimento(nascimento.toLocalDate());
-        }
-        usuario.setEmail(rs.getString("email"));
-        usuario.setTelefone(rs.getString("telefone"));
-        usuario.setSenha(rs.getString("senha"));
-        usuario.setStatus(StatusCadastro.valueOf(rs.getString("status")));
-        usuario.setMotivoRecusa(rs.getString("motivo_recusa"));
-        return usuario;
+        u.setId(rs.getInt("id"));
+        u.setNome(rs.getString("nome"));
+        u.setCpf(rs.getString("cpf"));
+        u.setDataNascimento(rs.getDate("data_nascimento").toLocalDate());
+        u.setEmail(rs.getString("email"));
+        u.setTelefone(rs.getString("telefone"));
+        u.setSenha(rs.getString("senha"));
+        u.setStatus(StatusCadastro.valueOf(rs.getString("status")));
+        u.setMotivoRecusa(rs.getString("motivo_recusa"));
+        return u;
     }
 }

@@ -40,6 +40,15 @@ public final class Json {
         return this;
     }
 
+    /** Valores em dinheiro vao como numero com 2 casas (ex.: 12.50). */
+    public Json add(String chave, java.math.BigDecimal valor) {
+        return bruto(chave, valor == null ? null : valor.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+    }
+
+    public Json add(String chave, double valor) {
+        return bruto(chave, String.valueOf(valor));
+    }
+
     public Json add(String chave, int valor) {
         return bruto(chave, String.valueOf(valor));
     }
@@ -157,6 +166,36 @@ public final class Json {
         if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) {
             v = v.substring(1, v.length() - 1);
         }
-        return v.replace("\\\"", "\"").replace("\\n", "\n").replace("\\\\", "\\");
+        return desescapar(v);
+    }
+
+    private static String desescapar(String v) {
+        if (v.indexOf('\\') < 0) {
+            return v;
+        }
+        StringBuilder out = new StringBuilder(v.length());
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c != '\\' || i + 1 >= v.length()) {
+                out.append(c);
+                continue;
+            }
+            char n = v.charAt(++i);
+            switch (n) {
+                case 'n' -> out.append('\n');
+                case 'r' -> out.append('\r');
+                case 't' -> out.append('\t');
+                case 'b' -> out.append('\b');
+                case 'f' -> out.append('\f');
+                case 'u' -> {
+                    if (i + 4 < v.length()) {
+                        out.append((char) Integer.parseInt(v.substring(i + 1, i + 5), 16));
+                        i += 4;
+                    }
+                }
+                default -> out.append(n);   // \" \\ \/
+            }
+        }
+        return out.toString();
     }
 }

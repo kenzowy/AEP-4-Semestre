@@ -3,63 +3,46 @@ package br.com.transportesocial.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Pagamento da parte do cidadao em uma viagem (RN08). */
+/**
+ * Pagamento da parte do cidadao (RF11). So existe ligado a uma Viagem
+ * (composicao). O pagamento por cartao e Pix e simulado, sem integracao
+ * com instituicao financeira (fora do escopo).
+ */
 public class Pagamento {
 
-    private long id;
-    private long viagemId;
-    private BigDecimal valorTotal;
-    private BigDecimal valorSubsidio;
-    private BigDecimal valorCidadao;
-    private FormaPagamento formaPagamento;
-    private boolean autorizado;
-    private LocalDateTime dataPagamento = LocalDateTime.now();
+    private int id;
+    private BigDecimal valor;
+    private FormaPagamento forma;
+    private boolean aprovado;
+    private LocalDateTime dataHora;
 
     public Pagamento() {
     }
 
-    public Pagamento(long viagemId, BigDecimal valorTotal, BigDecimal valorSubsidio,
-                     BigDecimal valorCidadao, FormaPagamento formaPagamento) {
-        this.viagemId = viagemId;
-        this.valorTotal = valorTotal;
-        this.valorSubsidio = valorSubsidio;
-        this.valorCidadao = valorCidadao;
-        this.formaPagamento = formaPagamento;
+    public Pagamento(BigDecimal valor, FormaPagamento forma) {
+        this.valor = valor;
+        this.forma = forma;
+        this.dataHora = LocalDateTime.now();
     }
 
-    /**
-     * Simula a autorizacao da operadora de cartao / Pix.
-     * O projeto nao integra com instituicao financeira real.
-     */
+    /** Simula a autorizacao do pagamento. */
     public boolean processar() {
-        this.autorizado = valorCidadao != null
-                && valorCidadao.compareTo(BigDecimal.ZERO) >= 0
-                && formaPagamento != null;
-        this.dataPagamento = LocalDateTime.now();
-        return autorizado;
+        aprovado = valor != null && valor.signum() > 0 && forma != null;
+        return aprovado;
     }
 
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
-    public long getViagemId() { return viagemId; }
-    public void setViagemId(long viagemId) { this.viagemId = viagemId; }
+    public BigDecimal getValor() { return valor; }
+    public void setValor(BigDecimal valor) { this.valor = valor; }
 
-    public BigDecimal getValorTotal() { return valorTotal; }
-    public void setValorTotal(BigDecimal valorTotal) { this.valorTotal = valorTotal; }
+    public FormaPagamento getForma() { return forma; }
+    public void setForma(FormaPagamento forma) { this.forma = forma; }
 
-    public BigDecimal getValorSubsidio() { return valorSubsidio; }
-    public void setValorSubsidio(BigDecimal valorSubsidio) { this.valorSubsidio = valorSubsidio; }
+    public boolean isAprovado() { return aprovado; }
+    public void setAprovado(boolean aprovado) { this.aprovado = aprovado; }
 
-    public BigDecimal getValorCidadao() { return valorCidadao; }
-    public void setValorCidadao(BigDecimal valorCidadao) { this.valorCidadao = valorCidadao; }
-
-    public FormaPagamento getFormaPagamento() { return formaPagamento; }
-    public void setFormaPagamento(FormaPagamento formaPagamento) { this.formaPagamento = formaPagamento; }
-
-    public boolean isAutorizado() { return autorizado; }
-    public void setAutorizado(boolean autorizado) { this.autorizado = autorizado; }
-
-    public LocalDateTime getDataPagamento() { return dataPagamento; }
-    public void setDataPagamento(LocalDateTime dataPagamento) { this.dataPagamento = dataPagamento; }
+    public LocalDateTime getDataHora() { return dataHora; }
+    public void setDataHora(LocalDateTime dataHora) { this.dataHora = dataHora; }
 }

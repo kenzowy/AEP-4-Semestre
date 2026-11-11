@@ -4,104 +4,99 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
-/**
- * Viagem solicitada por um cidadao. Concentra as regras de calculo
- * do valor e do subsidio pago pela prefeitura (RN06 e RN07).
- */
+/** Corrida solicitada por um cidadao e realizada por um motorista. */
 public class Viagem {
 
-    /** Tarifa fixa cobrada em qualquer viagem (RN07). */
-    public static final BigDecimal TARIFA_BASE = new BigDecimal("5.00");
-
-    /** Valor cobrado por quilometro rodado (RN07). */
-    public static final BigDecimal VALOR_KM = new BigDecimal("2.00");
-
-    /** Percentual pago pela prefeitura (RN06). */
+    /** RN06: a prefeitura paga 50% da viagem, com teto de R$ 15,00. */
+    public static final BigDecimal TETO_SUBSIDIO = new BigDecimal("15.00");
     public static final BigDecimal PERCENTUAL_SUBSIDIO = new BigDecimal("0.50");
 
-    /** Valor maximo que a prefeitura paga por viagem (RN06). */
-    public static final BigDecimal TETO_SUBSIDIO = new BigDecimal("15.00");
+    /** RN07: tarifa base + valor por km, definidos pela prefeitura. */
+    public static final BigDecimal TARIFA_BASE = new BigDecimal("5.00");
+    public static final BigDecimal VALOR_POR_KM = new BigDecimal("2.00");
 
-    private long id;
-    private long cidadaoId;
-    private Long motoristaId;
+    /** RN09: solicitacao sem motorista apos 10 minutos e cancelada pelo sistema. */
+    public static final int MINUTOS_PARA_EXPIRAR = 10;
+
+    /** Velocidade media urbana usada para estimar o tempo de chegada (RF10). */
+    public static final double VELOCIDADE_MEDIA_KMH = 30.0;
+
+    private int id;
     private String origem;
     private String destino;
-    private BigDecimal distanciaKm = BigDecimal.ZERO;
+    private double distanciaKm;
     private BigDecimal valorTotal = BigDecimal.ZERO;
     private BigDecimal valorSubsidio = BigDecimal.ZERO;
     private BigDecimal valorCidadao = BigDecimal.ZERO;
-    private LocalDateTime dataHora = LocalDateTime.now();
+    private int qtdAcompanhantes;
+    private LocalDateTime dataHora;
     private StatusViagem status = StatusViagem.SOLICITADA;
 
-    // campos auxiliares usados apenas para exibicao nas telas
-    private String nomeCidadao;
-    private String nomeMotorista;
-    private boolean pago;
+    private Cidadao cidadao;        // quem solicitou (1)
+    private Motorista motorista;    // quem realiza (0..1)
+    private Pagamento pagamento;    // composicao (0..1)
 
     public Viagem() {
     }
 
-    public Viagem(long cidadaoId, String origem, String destino, BigDecimal distanciaKm) {
-        this.cidadaoId = cidadaoId;
-        this.origem = origem;
-        this.destino = destino;
-        this.distanciaKm = distanciaKm;
-        calcularValores();
-    }
-
-    /** Valor cheio da corrida: tarifa base + valor por km. */
-    public BigDecimal calcularValor() {
-        BigDecimal km = distanciaKm == null ? BigDecimal.ZERO : distanciaKm;
-        return TARIFA_BASE.add(VALOR_KM.multiply(km)).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /** Parte paga pela prefeitura: 50% do valor, limitado ao teto de R$ 15,00. */
-    public BigDecimal calcularSubsidio() {
-        BigDecimal metade = calcularValor().multiply(PERCENTUAL_SUBSIDIO)
-                .setScale(2, RoundingMode.HALF_UP);
-        return metade.min(TETO_SUBSIDIO);
-    }
-
-    /** Recalcula e guarda os tres valores da viagem. */
-    public void calcularValores() {
-        this.valorTotal = calcularValor();
-        this.valorSubsidio = calcularSubsidio();
-        this.valorCidadao = valorTotal.subtract(valorSubsidio).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /** @return mensagem de erro ou null quando a solicitacao esta valida */
-    public String validar() {
+    public Viagem(String origem, String destino, int qtdAcompanhantes) {
         if (origem == null || origem.isBlank() || destino == null || destino.isBlank()) {
-            return "Informe a origem e o destino.";
+            throw new RegraNegocioException("Informe a origem e o destino.");
         }
-        if (distanciaKm == null || distanciaKm.compareTo(BigDecimal.ZERO) <= 0) {
-            return "Informe a distancia da viagem.";
+        if (qtdAcompanhantes < 0) {
+            throw new RegraNegocioException("Quantidade de menores acompanhantes invalida.");
         }
-        return null;
+        this.origem = origem.trim();
+        this.destino = destino.trim();
+        this.qtdAcompanhantes = qtdAcompanhantes;
+        this.dataHora = LocalDateTime.now();
     }
 
-    /**
-     * Tempo estimado, em minutos, para o motorista chegar ate o passageiro (RF10).
-     * Considera 3 minutos de deslocamento inicial mais 2 minutos por quilometro.
-     */
-    public int calcularTempoEstimado() {
-        BigDecimal km = distanciaKm == null ? BigDecimal.ZERO : distanciaKm;
-        return 3 + km.multiply(new BigDecimal("2")).setScale(0, RoundingMode.CEILING).intValue();
+    /** RN07: valor total = tarifa base + km x valor por km. */
+    public BigDecimal calcularValor() {
+        if (distanciaKm <= 0) {
+            throw new RegraNegocioException("Informe a distancia da viagem.");
+        }
+        valorTotal = TARIFA_BASE
+                .add(VALOR_POR_KM.multiply(BigDecimal.valueOf(distanciaKm)))
+                .setScale(2, RoundingMode.HALF_UP);
+        return valorTotal;
     }
 
-    public boolean podeSerCancelada() {
-        return status == StatusViagem.SOLICITADA || status == StatusViagem.ACEITA;
+    /** RN06: subsidio = menor valor entre (total x 50%) e R$ 15,00. */
+    public BigDecimal calcularSubsidio() {
+        BigDecimal metade = valorTotal.multiply(PERCENTUAL_SUBSIDIO).setScale(2, RoundingMode.HALF_UP);
+        valorSubsidio = metade.min(TETO_SUBSIDIO);
+        valorCidadao = valorTotal.subtract(valorSubsidio);
+        return valorSubsidio;
     }
 
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
+    /** Controla o fluxo de status permitido para a viagem. */
+    public void alterarStatus(StatusViagem novo) {
+        boolean permitido = switch (status) {
+            case SOLICITADA -> novo == StatusViagem.ACEITA || novo == StatusViagem.CANCELADA;
+            case ACEITA -> novo == StatusViagem.EM_ANDAMENTO || novo == StatusViagem.CANCELADA;
+            case EM_ANDAMENTO -> novo == StatusViagem.CONCLUIDA;
+            default -> false;
+        };
+        if (!permitido) {
+            throw new RegraNegocioException("Nao e possivel mudar a viagem de " + status + " para " + novo + ".");
+        }
+        status = novo;
+        if (novo == StatusViagem.CANCELADA) {
+            // RN09: viagem cancelada nao gera subsidio nem cobranca
+            valorSubsidio = BigDecimal.ZERO.setScale(2);
+            valorCidadao = BigDecimal.ZERO.setScale(2);
+        }
+    }
 
-    public long getCidadaoId() { return cidadaoId; }
-    public void setCidadaoId(long cidadaoId) { this.cidadaoId = cidadaoId; }
+    /** RF10: tempo estimado de chegada, em minutos, pela distancia e velocidade media. */
+    public int getTempoEstimadoMinutos() {
+        return (int) Math.max(1, Math.ceil(distanciaKm / VELOCIDADE_MEDIA_KMH * 60));
+    }
 
-    public Long getMotoristaId() { return motoristaId; }
-    public void setMotoristaId(Long motoristaId) { this.motoristaId = motoristaId; }
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
     public String getOrigem() { return origem; }
     public void setOrigem(String origem) { this.origem = origem; }
@@ -109,8 +104,13 @@ public class Viagem {
     public String getDestino() { return destino; }
     public void setDestino(String destino) { this.destino = destino; }
 
-    public BigDecimal getDistanciaKm() { return distanciaKm; }
-    public void setDistanciaKm(BigDecimal distanciaKm) { this.distanciaKm = distanciaKm; }
+    public double getDistanciaKm() { return distanciaKm; }
+    public void setDistanciaKm(double distanciaKm) {
+        if (distanciaKm <= 0 || distanciaKm > 200) {
+            throw new RegraNegocioException("Distancia invalida (entre 0,1 e 200 km).");
+        }
+        this.distanciaKm = distanciaKm;
+    }
 
     public BigDecimal getValorTotal() { return valorTotal; }
     public void setValorTotal(BigDecimal valorTotal) { this.valorTotal = valorTotal; }
@@ -121,18 +121,22 @@ public class Viagem {
     public BigDecimal getValorCidadao() { return valorCidadao; }
     public void setValorCidadao(BigDecimal valorCidadao) { this.valorCidadao = valorCidadao; }
 
+    public int getQtdAcompanhantes() { return qtdAcompanhantes; }
+    public void setQtdAcompanhantes(int qtdAcompanhantes) { this.qtdAcompanhantes = qtdAcompanhantes; }
+
     public LocalDateTime getDataHora() { return dataHora; }
     public void setDataHora(LocalDateTime dataHora) { this.dataHora = dataHora; }
 
     public StatusViagem getStatus() { return status; }
+    /** Usado pelo DAO ao carregar do banco (sem validar o fluxo). */
     public void setStatus(StatusViagem status) { this.status = status; }
 
-    public String getNomeCidadao() { return nomeCidadao; }
-    public void setNomeCidadao(String nomeCidadao) { this.nomeCidadao = nomeCidadao; }
+    public Cidadao getCidadao() { return cidadao; }
+    public void setCidadao(Cidadao cidadao) { this.cidadao = cidadao; }
 
-    public String getNomeMotorista() { return nomeMotorista; }
-    public void setNomeMotorista(String nomeMotorista) { this.nomeMotorista = nomeMotorista; }
+    public Motorista getMotorista() { return motorista; }
+    public void setMotorista(Motorista motorista) { this.motorista = motorista; }
 
-    public boolean isPago() { return pago; }
-    public void setPago(boolean pago) { this.pago = pago; }
+    public Pagamento getPagamento() { return pagamento; }
+    public void setPagamento(Pagamento pagamento) { this.pagamento = pagamento; }
 }

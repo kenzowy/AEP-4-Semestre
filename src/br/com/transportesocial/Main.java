@@ -1,45 +1,43 @@
 package br.com.transportesocial;
 
+import br.com.transportesocial.controle.Servidor;
+import br.com.transportesocial.controle.ViagemControle;
 import br.com.transportesocial.util.Conexao;
-import br.com.transportesocial.util.Senha;
-import br.com.transportesocial.web.Servidor;
 
-/**
- * Ponto de entrada da aplicacao Transporte Social.
- *
- * Uso:
- *   java -cp "bin;lib/mysql-connector-j.jar" br.com.transportesocial.Main
- *
- * No Linux/Mac substitua ; por : na linha acima.
- *
- * Para gerar o hash da senha do administrador:
- *   java -cp "bin;lib/mysql-connector-j.jar" br.com.transportesocial.util.Senha admin123
- */
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/** Ponto de entrada: confere o banco, liga o servidor e a rotina de cancelamento automatico. */
 public class Main {
 
+    private static final int PORTA = 8080;
+
     public static void main(String[] args) throws Exception {
-
-        System.out.println("=================================================");
-        System.out.println("  Transporte Social - Sistema de Mobilidade");
-        System.out.println("=================================================");
-
-        // Verifica conexao com o banco
-        System.out.print("[BANCO] Testando conexao... ");
+        System.out.println("=== Transporte Social ===");
         if (!Conexao.testar()) {
-            System.out.println("FALHOU");
-            System.out.println();
-            System.out.println("ATENCAO: Nao foi possivel conectar ao banco de dados.");
-            System.out.println("Verifique se o XAMPP esta rodando e o banco 'transporte_social' foi criado.");
-            System.out.println("Execute o arquivo database/script.sql no phpMyAdmin.");
+            System.out.println("Nao foi possivel conectar ao MySQL.");
+            System.out.println("Confira: 1) MySQL ligado no XAMPP  2) script database/script.sql importado");
+            System.out.println("         3) usuario/senha em src/br/com/transportesocial/util/Conexao.java");
             System.exit(1);
         }
-        System.out.println("OK");
+        System.out.println("[BANCO] Conectado ao banco transporte_social.");
 
-        // Inicia o servidor HTTP
-        Servidor servidor = new Servidor();
-        servidor.iniciar();
+        // RN09: a cada minuto cancela as solicitacoes sem motorista ha mais de 10 minutos.
+        ScheduledExecutorService agenda = Executors.newSingleThreadScheduledExecutor();
+        agenda.scheduleAtFixedRate(() -> {
+            try {
+                int canceladas = ViagemControle.cancelarSolicitacoesExpiradas();
+                if (canceladas > 0) {
+                    System.out.println("[RN09] " + canceladas + " solicitacao(oes) cancelada(s) por falta de motorista.");
+                }
+            } catch (Exception e) {
+                System.out.println("[RN09] Falha ao cancelar solicitacoes: " + e.getMessage());
+            }
+        }, 1, 1, TimeUnit.MINUTES);
 
-        System.out.println("[INFO] Pressione Ctrl+C para encerrar.");
-        System.out.println("=================================================");
+        new Servidor(PORTA).iniciar();
+        System.out.println("[SERVIDOR] Sistema no ar. Abra no navegador: http://localhost:" + PORTA);
+        System.out.println("Para encerrar, pressione Ctrl + C.");
     }
 }
