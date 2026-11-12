@@ -8,6 +8,8 @@ ODS 10 (Redução das Desigualdades) e ODS 11 (Cidades e Comunidades Sustentáve
 **Instituição:** Unicesumar (Maringá - PR)
 **Stack:** Java 21 · MySQL (XAMPP/phpMyAdmin) · HTML, CSS e JavaScript
 
+> ✅ **Status (2ª entrega):** os 14 requisitos funcionais (RF01 a RF14), os requisitos não funcionais e as 9 regras de negócio descritos abaixo estão implementados e funcionando.
+
 ---
 
 ## Como executar
@@ -17,15 +19,22 @@ ODS 10 (Redução das Desigualdades) e ODS 11 (Cidades e Comunidades Sustentáve
 |------|-------------|
 | Java JDK 21 ou superior | https://www.oracle.com/java/technologies/downloads/ |
 | XAMPP (MySQL + phpMyAdmin) | https://www.apachefriends.org/ |
-| MySQL Connector/J (Plataforma Independente) | https://dev.mysql.com/downloads/connector/j/ |
 
-1. Coloque o `.jar` do Connector/J na pasta `lib/` com o nome **`mysql-connector-j.jar`**.
+> O driver do MySQL (`lib/mysql-connector-j.jar`) já vem no repositório, não é preciso baixar.
+
+1. Clone o repositório: `git clone https://github.com/kenzowy/AEP-4-Semestre.git` e entre na pasta `AEP-4-Semestre`.
 2. No XAMPP, ligue o **MySQL**. Abra http://localhost/phpmyadmin, aba **SQL**, cole o conteúdo de `database/script.sql` e clique em **Executar**.
 3. Na pasta do projeto, compile e execute:
 
 **Windows (Git Bash)**
 ```bash
 javac -encoding UTF-8 -cp "lib/mysql-connector-j.jar" -d bin $(find src -name "*.java")
+java -cp "bin;lib/mysql-connector-j.jar" br.com.transportesocial.Main
+```
+
+**Windows (PowerShell)**
+```powershell
+javac -encoding UTF-8 -cp "lib/mysql-connector-j.jar" -d bin (Get-ChildItem -Recurse src -Filter *.java).FullName
 java -cp "bin;lib/mysql-connector-j.jar" br.com.transportesocial.Main
 ```
 
@@ -39,7 +48,23 @@ java -cp "bin:lib/mysql-connector-j.jar" br.com.transportesocial.Main
 
 **Administrador da prefeitura:** CPF `000.000.000-00` · senha `admin123`
 
+> Credenciais de demonstração, para uso local na avaliação. O CPF é fictício e a senha fica gravada no banco com hash BCrypt. Em uma implantação real, a prefeitura deve trocar essa senha no primeiro acesso, em **Minha conta**.
+
 > O MySQL do XAMPP usa o usuário `root` sem senha. Se o seu for diferente, altere `src/br/com/transportesocial/util/Conexao.java`.
+
+---
+
+## Telas do sistema
+
+| Login | Cidadão |
+|---|---|
+| ![Tela de login](docs/img/01-login.png) | ![Painel do cidadão](docs/img/02-cidadao.png) |
+
+| Motorista | Administrador da prefeitura |
+|---|---|
+| ![Painel do motorista](docs/img/03-motorista.png) | ![Painel do administrador](docs/img/04-administrador.png) |
+
+<p align="center"><img src="docs/img/05-celular.png" alt="Sistema no celular" width="280"></p>
 
 ---
 
@@ -99,6 +124,7 @@ java -cp "bin:lib/mysql-connector-j.jar" br.com.transportesocial.Main
 AEP-4-Semestre/
 ├── database/script.sql        # criação do banco (igual ao DER da 1ª entrega)
 ├── docs/                      # documento da 1ª entrega (requisitos, diagramas, DER)
+│   └── img/                   # capturas de tela do sistema
 ├── lib/mysql-connector-j.jar  # driver JDBC do MySQL
 ├── src/br/com/transportesocial/
 │   ├── Main.java
