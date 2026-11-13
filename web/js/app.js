@@ -287,12 +287,73 @@ async function cadastrar(evento) {
 /* =====================================================================
    Entrada no sistema: cada perfil vê só a sua tela (RNF01)
    ===================================================================== */
+const MENUS = {
+  CIDADAO: [
+    { ic: '🏠', texto: 'Painel', alvo: 'topo' },
+    { ic: '📍', texto: 'Solicitar viagem', alvo: 'card-solicitar' },
+    { ic: '🕘', texto: 'Histórico', alvo: 'card-historico' }
+  ],
+  MOTORISTA: [
+    { ic: '🏠', texto: 'Painel', alvo: 'topo' },
+    { ic: '📋', texto: 'Solicitações', alvo: 'card-abertas' },
+    { ic: '🚗', texto: 'Meus veículos', alvo: 'card-veiculos' },
+    { ic: '🕘', texto: 'Minhas corridas', alvo: 'card-corridas' }
+  ],
+  ADMIN: [
+    { ic: '⏳', texto: 'Cadastros pendentes', aba: 'tab-pendentes' },
+    { ic: '👥', texto: 'Usuários', aba: 'tab-usuarios' },
+    { ic: '📊', texto: 'Relatório', aba: 'tab-relatorio' }
+  ]
+};
+
+/** Menu lateral: cada perfil vê só as suas opções (RNF01). */
+function montarMenu(u) {
+  const aprovado = u.status === 'APROVADO' || u.tipo === 'ADMIN';
+  const itens = MENUS[u.tipo].filter((i) => aprovado || i.alvo === 'topo' || i.alvo === 'card-veiculos');
+  $('menu').innerHTML = itens.map((i, n) => `
+      <button class="nav ${n === 0 ? 'ativo' : ''}" data-alvo="${i.alvo || ''}" data-aba="${i.aba || ''}"><span class="ic">${i.ic}</span>${i.texto}</button>`).join('')
+    + '<button class="nav" id="btn-conta"><span class="ic">👤</span>Minha conta</button>'
+    + '<button class="nav nav-sair" id="btn-sair"><span class="ic">↩</span>Sair</button>';
+  $('menu').querySelectorAll('.nav[data-alvo], .nav[data-aba]').forEach((b) => {
+    if (!b.dataset.alvo && !b.dataset.aba) return;
+    b.addEventListener('click', () => {
+      if (b.dataset.aba) { mudarAba(b.dataset.aba); return; }
+      $('menu').querySelectorAll('.nav').forEach((x) => x.classList.toggle('ativo', x === b));
+      if (b.dataset.alvo === 'topo') window.scrollTo({ top: 0, behavior: 'smooth' });
+      else $(b.dataset.alvo).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  $('btn-conta').addEventListener('click', abrirMinhaConta);
+  $('btn-sair').addEventListener('click', () => sairDoSistema());
+}
+
+function desenharCabecalho(u) {
+  const primeiroNome = (u.nome || '').split(' ')[0];
+  $('perfil-avatar').textContent = primeiroNome.charAt(0).toUpperCase();
+  $('perfil-nome').textContent = u.nome;
+  $('perfil-tipo').textContent = `${NOME_TIPO[u.tipo]}${u.tipo === 'ADMIN' ? '' : ' · ' + NOME_STATUS_CADASTRO[u.status]}`;
+  const textos = {
+    CIDADAO: ['Para onde você precisa ir hoje?'],
+    MOTORISTA: ['Acompanhe e atenda as solicitações de viagem.'],
+    ADMIN: ['Análise de cadastros e gastos do programa.']
+  };
+  $('saudacao').textContent = u.tipo === 'ADMIN' ? 'Painel da prefeitura' : `Olá, ${primeiroNome} 👋`;
+  $('subtitulo').textContent = textos[u.tipo][0];
+  const tag = $('tag-situacao');
+  if (u.tipo === 'ADMIN') {
+    tag.className = 'tag badge-ADMIN';
+    tag.textContent = 'Administrador';
+  } else {
+    tag.className = `tag badge-${u.status}`;
+    tag.textContent = `Cadastro ${NOME_STATUS_CADASTRO[u.status].toLowerCase()}`;
+  }
+}
+
 function entrarNoSistema(u) {
   usuario = u;
   mostrarTela('tela-app');
-  $('nav-nome').textContent = u.nome;
-  $('nav-badge').textContent = NOME_TIPO[u.tipo];
-  $('nav-badge').className = `badge badge-${u.tipo}`;
+  desenharCabecalho(u);
+  montarMenu(u);
 
   ['painel-cidadao', 'painel-motorista', 'painel-admin'].forEach((p) => $(p).classList.add('hidden'));
   mostrarSituacaoCadastro();
@@ -302,6 +363,7 @@ function entrarNoSistema(u) {
     $('painel-admin').classList.remove('hidden');
     mudarAba('tab-pendentes');
     prepararRelatorio();
+    carregarIndicadoresAdmin();
   } else if (u.tipo === 'CIDADAO') {
     abrirPainelCidadao();
   } else {
@@ -387,6 +449,7 @@ async function calcularValor() {
     $('sol-subsidio').textContent = dinheiro(r.valorSubsidio);
     $('sol-paga').textContent = dinheiro(r.valorCidadao);
     $('sol-tempo').textContent = `~${r.tempoEstimadoMin} min`;
+    $('sol-barra').style.width = `${(r.valorSubsidio / r.valorTotal) * 100}%`;
     $('sol-preview').classList.remove('hidden');
     $('btn-confirmar').disabled = false;
   } catch (e) {
@@ -423,20 +486,81 @@ async function carregarViagensCidadao() {
   try {
     const r = await api('GET', '/viagens/minhas');
     $('stat-restantes').textContent = r.restantesNaSemana;
+    $('stat-restantes-txt').textContent = r.restantesNaSemana;
     $('stat-limite').textContent = r.limiteSemanal;
+    $('anel-restantes').style.setProperty('--p', (r.restantesNaSemana / r.limiteSemanal) * 100);
+    const atual = r.viagens.find((v) => ATIVAS.includes(v.status));
+    desenharViagemAtual(atual);
+    r.viagens = r.viagens.filter((v) => v !== atual);
     const bloqueado = r.restantesNaSemana <= 0;
     $('btn-calcular').disabled = bloqueado;
     if (bloqueado) {
       mensagem($('sol-msg'), `Você já usou as ${r.limiteSemanal} viagens desta semana. Novas solicitações na próxima segunda-feira.`, 'info');
     }
     if (r.viagens.length === 0) {
-      lista.innerHTML = '<p class="vazio">Você ainda não fez nenhuma viagem.</p>';
+      lista.innerHTML = '<p class="vazio">Nenhuma viagem no histórico ainda.</p>';
       return;
     }
     lista.innerHTML = r.viagens.map(itemViagemCidadao).join('');
   } catch (e) {
     lista.innerHTML = `<p class="alerta alerta-erro">${esc(e.message)}</p>`;
   }
+}
+
+/** RF10: etapas da viagem, motorista e tempo estimado de chegada. */
+function desenharViagemAtual(v) {
+  const caixa = $('viagem-atual');
+  const tag = $('tag-atual');
+  if (!v) {
+    caixa.innerHTML = '<p class="vazio">Nenhuma viagem em andamento.<br />Solicite uma viagem ao lado.</p>';
+    tag.classList.add('hidden');
+    $('kpi-atual').textContent = 'Nenhuma';
+    $('kpi-atual-sub').textContent = 'Solicite uma viagem';
+    return;
+  }
+  tag.className = `tag badge-${v.status}`;
+  tag.textContent = NOME_STATUS_VIAGEM[v.status];
+  $('kpi-atual').textContent = NOME_STATUS_VIAGEM[v.status];
+  $('kpi-atual-sub').textContent = `Tempo estimado: ~${v.tempoEstimadoMin} min`;
+
+  const etapas = ['SOLICITADA', 'ACEITA', 'EM_ANDAMENTO', 'CONCLUIDA'];
+  const nomes = ['Solicitada', 'Aceita', 'Em viagem', 'Concluída'];
+  const atual = etapas.indexOf(v.status);
+  const passos = etapas.map((e, i) => {
+    const classe = i < atual ? 'ok' : (i === atual ? (i === 0 ? 'ok' : 'atual') : '');
+    const bola = classe === 'ok' ? '✓' : i + 1;
+    const traco = i < etapas.length - 1 ? `<div class="traco ${i < atual ? 'ok' : ''}"></div>` : '';
+    return `<div class="passo ${classe}"><div class="bola">${bola}</div>${nomes[i]}</div>${traco}`;
+  }).join('');
+
+  let pessoa;
+  if (v.motoristaNome) {
+    pessoa = `
+      <div class="caixa-pessoa">
+        <div class="avatar">${esc(v.motoristaNome.charAt(0).toUpperCase())}</div>
+        <div><strong>${esc(v.motoristaNome)}</strong><small>Motorista credenciado</small></div>
+        <div class="eta"><small>Tempo estimado</small><b>~${v.tempoEstimadoMin} min</b></div>
+      </div>`;
+  } else {
+    pessoa = `
+      <div class="caixa-pessoa">
+        <div class="avatar">…</div>
+        <div><strong>Procurando motorista</strong><small>Aguardando um motorista aceitar</small></div>
+        <div class="eta"><small>Tempo estimado</small><b>~${v.tempoEstimadoMin} min</b></div>
+      </div>
+      <p class="aviso-espera">Sem motorista em 10 minutos, a solicitação é cancelada automaticamente, sem custo.</p>`;
+  }
+  const podeCancelar = v.status === 'SOLICITADA' || v.status === 'ACEITA';
+  caixa.innerHTML = `
+    <div class="trajeto">${esc(v.origem)} → <b>${esc(v.destino)}</b></div>
+    <div class="passos">${passos}</div>
+    ${pessoa}
+    <div class="item-info" style="margin-top:12px">
+      <span>📏 ${String(v.distanciaKm).replace('.', ',')} km</span>
+      <span>👶 Menores: ${v.qtdAcompanhantes}</span>
+      ${infoValores(v)}
+    </div>
+    ${podeCancelar ? `<button class="btn btn-perigo btn-block" style="margin-top:14px" onclick="cancelarViagem(${v.id})">Cancelar sem custo</button>` : ''}`;
 }
 
 function infoValores(v) {
@@ -520,8 +644,7 @@ async function abrirPainelMotorista() {
   $('painel-motorista').classList.remove('hidden');
   const aprovado = usuario.status === 'APROVADO';
   // RF04: sem aprovação, o motorista só mantém os dados do veículo
-  ['card-disponibilidade', 'card-abertas'].forEach((c) => $(c).classList.toggle('hidden', !aprovado));
-  $('lista-viagens-motorista').closest('.card').classList.toggle('hidden', !aprovado);
+  ['card-disponibilidade', 'card-abertas', 'card-corridas'].forEach((c) => $(c).classList.toggle('hidden', !aprovado));
   desenharVeiculos();
   if (aprovado) {
     desenharDisponibilidade();
@@ -532,9 +655,13 @@ async function abrirPainelMotorista() {
 
 function desenharDisponibilidade() {
   $('chk-disponivel').checked = !!usuario.disponivel;
+  $('card-disponibilidade').classList.toggle('ligado', !!usuario.disponivel);
+  $('titulo-disponivel').innerHTML = usuario.disponivel
+    ? '<span class="pulso"></span>&nbsp; Você está disponível'
+    : 'Você está indisponível';
   $('txt-disponivel').textContent = usuario.disponivel
-    ? 'Você está DISPONÍVEL e recebe as solicitações abertas.'
-    : 'Você está INDISPONÍVEL. Ligue para ver e aceitar solicitações.';
+    ? 'Recebendo as solicitações em aberto. Desligue para ficar indisponível.'
+    : 'Ligue para ver e aceitar as solicitações de viagem.';
 }
 
 /** RF06 */
@@ -692,7 +819,7 @@ async function acaoMotorista(id, acao) {
    ADMINISTRADOR
    ===================================================================== */
 function mudarAba(id) {
-  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('ativo', t.dataset.tab === id));
+  document.querySelectorAll('#menu .nav[data-aba]').forEach((t) => t.classList.toggle('ativo', t.dataset.aba === id));
   document.querySelectorAll('.tab-conteudo').forEach((c) => c.classList.toggle('hidden', c.id !== id));
   if (id === 'tab-pendentes') carregarPendentes();
   if (id === 'tab-usuarios') carregarUsuarios();
@@ -723,11 +850,23 @@ function botoesDocumentos(u) {
   ).join('');
 }
 
+/** Indicadores do painel: pendentes (RF03) e o relatório do mês atual (RF14). */
+async function carregarIndicadoresAdmin() {
+  try {
+    const hoje = new Date();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const r = await api('GET', `/relatorio?inicio=${iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1))}&fim=${iso(hoje)}`);
+    $('kpi-viagens-mes').textContent = r.quantidade;
+    $('kpi-subsidio-mes').textContent = dinheiro(r.totalSubsidio);
+  } catch (e) { /* indicadores são só informativos */ }
+}
+
 /** RF03: cadastros pendentes com documentos, aprovar e recusar. */
 async function carregarPendentes() {
   const lista = $('lista-pendentes');
   try {
     const usuarios = await api('GET', '/usuarios?status=PENDENTE');
+    $('kpi-pendentes').textContent = usuarios.length;
     if (usuarios.length === 0) {
       lista.innerHTML = '<p class="vazio">Nenhum cadastro pendente. 🎉</p>';
       return;
@@ -869,10 +1008,10 @@ async function gerarRelatorio(evento) {
     saida.innerHTML = `
       <p class="subtexto">Período: ${dataCurta(r.inicio)} a ${dataCurta(r.fim)} — somente viagens concluídas
         (viagem cancelada não gera subsídio).</p>
-      <div class="stats-row" style="grid-template-columns: repeat(3, 1fr); margin-top: 12px">
-        <div class="stat-card"><div class="stat-valor">${r.quantidade}</div><div class="stat-label">Viagens realizadas</div></div>
-        <div class="stat-card"><div class="stat-valor">${dinheiro(r.totalSubsidio)}</div><div class="stat-label">Subsídio pago pela prefeitura</div></div>
-        <div class="stat-card"><div class="stat-valor">${dinheiro(r.totalCidadaos)}</div><div class="stat-label">Pago pelos cidadãos</div></div>
+      <div class="grid g-3" style="margin-top: 12px">
+        <div class="card kpi"><div class="icone-kpi">🚐</div><div><small>Viagens realizadas</small><div class="num">${r.quantidade}</div></div></div>
+        <div class="card kpi"><div class="icone-kpi">R$</div><div><small>Subsídio pago pela prefeitura</small><div class="num num-texto">${dinheiro(r.totalSubsidio)}</div></div></div>
+        <div class="card kpi"><div class="icone-kpi">👥</div><div><small>Pago pelos cidadãos</small><div class="num num-texto">${dinheiro(r.totalCidadaos)}</div></div></div>
       </div>
       ${r.quantidade === 0 ? '<p class="vazio">Nenhuma viagem realizada neste período.</p>' : `
       <div class="tabela-wrap">
@@ -948,7 +1087,7 @@ async function abrirMinhaConta() {
         senhaAtual: $('conta-senha-atual').value,
         senhaNova: $('conta-senha-nova').value
       });
-      $('nav-nome').textContent = usuario.nome;
+      desenharCabecalho(usuario);
       fecharModal();
       toast('Dados atualizados.');
     } catch (erro) {
@@ -987,8 +1126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('input[name="tipo-cad"]').forEach((r) => r.addEventListener('change', ajustarCadastro));
   ajustarCadastro();
 
-  $('btn-sair').addEventListener('click', () => sairDoSistema());
-  $('btn-conta').addEventListener('click', abrirMinhaConta);
 
   $('btn-calcular').addEventListener('click', calcularValor);
   $('form-solicitar').addEventListener('submit', solicitarViagem);
@@ -1000,7 +1137,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-atualizar-abertas').addEventListener('click', carregarAbertas);
   $('btn-atualizar-motorista').addEventListener('click', carregarCorridas);
 
-  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => mudarAba(t.dataset.tab)));
   $('btn-atualizar-pendentes').addEventListener('click', carregarPendentes);
   $('btn-filtrar').addEventListener('click', carregarUsuarios);
   $('form-relatorio').addEventListener('submit', gerarRelatorio);

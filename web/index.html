@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Transporte Social — Prefeitura Municipal</title>
+  <link rel="icon" type="image/png" href="img/favicon.png" />
   <link rel="stylesheet" href="css/estilo.css" />
 </head>
 <body>
@@ -12,31 +13,39 @@
      LOGIN (RNF01)
      ========================================================= -->
 <section id="tela-login" class="tela">
-  <div class="login-wrapper">
-    <div class="login-logo">
-      <span class="logo-icon">🚐</span>
-      <h1>Transporte Social</h1>
-      <p>Transporte subsidiado pela Prefeitura Municipal</p>
+  <div class="entrada">
+    <div class="marca">
+      <div class="logo"><span class="logo-box"><img src="img/logo.png" alt="" /></span>Transporte Social</div>
+      <div class="heroi">
+        <img src="img/logo.png" alt="Carro do Transporte Social" />
+        <h1>Mobilidade que<br /><em>cabe no bolso</em><br />de quem mais precisa.</h1>
+        <p>A prefeitura paga metade da sua corrida, até R$ 15,00. Até 5 viagens por semana para trabalho, saúde e escola.</p>
+      </div>
+      <div class="chips">
+        <span class="chip">🎯 ODS 10 · Redução das Desigualdades</span>
+        <span class="chip">🏙️ ODS 11 · Cidades Sustentáveis</span>
+        <span class="chip">🔒 Dados protegidos (LGPD)</span>
+      </div>
     </div>
 
-    <div class="card login-card">
-      <h2>Entrar no sistema</h2>
-      <form id="form-login" novalidate>
-        <div class="campo">
-          <label for="login-cpf">CPF</label>
-          <input id="login-cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" required />
-        </div>
-        <div class="campo">
-          <label for="login-senha">Senha</label>
-          <input id="login-senha" type="password" placeholder="••••••" required />
-        </div>
-        <div id="login-msg" class="alerta hidden"></div>
-        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
-      </form>
-      <hr />
-      <p class="texto-centro">Ainda não tem cadastro?
-        <a href="#" id="link-cadastro">Cadastre-se aqui</a>
-      </p>
+    <div class="form-lado">
+      <div class="form-card">
+        <h2>Bem-vindo</h2>
+        <p class="sub">Entre com seu CPF para continuar</p>
+        <form id="form-login" novalidate>
+          <div class="campo">
+            <label for="login-cpf">CPF</label>
+            <input id="login-cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" required />
+          </div>
+          <div class="campo">
+            <label for="login-senha">Senha</label>
+            <input id="login-senha" type="password" placeholder="••••••" required />
+          </div>
+          <div id="login-msg" class="alerta hidden"></div>
+          <button type="submit" class="btn btn-primary btn-block">Entrar no sistema →</button>
+        </form>
+        <p class="rodape-form">Ainda não tem cadastro? <a href="#" id="link-cadastro">Cadastre-se</a></p>
+      </div>
     </div>
   </div>
 </section>
@@ -45,21 +54,21 @@
      CADASTRO DE CIDADÃO OU MOTORISTA (RF01, RF02, RF05)
      ========================================================= -->
 <section id="tela-cadastro" class="tela hidden">
-  <div class="login-wrapper">
-    <div class="login-logo">
-      <span class="logo-icon">🚐</span>
-      <h1>Transporte Social</h1>
-      <p>Novo cadastro</p>
+  <div class="cadastro-fundo">
+    <div class="cadastro-topo">
+      <div class="logo"><img src="img/logo.png" alt="" class="logo-img" />Transporte Social</div>
+      <a href="#" id="link-login" class="link-voltar">← Voltar para o login</a>
     </div>
 
-    <div class="card login-card login-card-largo">
+    <div class="card cadastro-card">
       <h2>Criar conta</h2>
+      <p class="sub">Depois de enviar, a prefeitura confere os seus documentos e aprova o cadastro.</p>
       <form id="form-cadastro" novalidate>
         <div class="campo">
           <label>Eu sou</label>
-          <div class="radio-group">
-            <label><input type="radio" name="tipo-cad" value="CIDADAO" checked /> Cidadão</label>
-            <label><input type="radio" name="tipo-cad" value="MOTORISTA" /> Motorista</label>
+          <div class="opcoes-tipo">
+            <label class="opcao"><input type="radio" name="tipo-cad" value="CIDADAO" checked /><span>🧍 Cidadão</span></label>
+            <label class="opcao"><input type="radio" name="tipo-cad" value="MOTORISTA" /><span>🚗 Motorista</span></label>
           </div>
         </div>
 
@@ -99,7 +108,7 @@
           <div class="grid-2">
             <div class="campo">
               <label for="cad-renda">Renda familiar mensal (R$)</label>
-              <input id="cad-renda" type="number" step="0.01" min="0" placeholder="1600.00" />
+              <input id="cad-renda" type="number" step="0.01" min="0" placeholder="1500" />
             </div>
             <div class="campo">
               <label for="cad-nis">NIS (opcional)</label>
@@ -147,10 +156,6 @@
         <div id="cad-msg" class="alerta hidden"></div>
         <button type="submit" class="btn btn-primary btn-block" id="btn-cadastrar">Enviar cadastro</button>
       </form>
-      <hr />
-      <p class="texto-centro">Já tem conta?
-        <a href="#" id="link-login">Entrar</a>
-      </p>
     </div>
   </div>
 </section>
@@ -159,201 +164,218 @@
      SISTEMA (após o login)
      ========================================================= -->
 <section id="tela-app" class="tela hidden">
+  <div class="app">
 
-  <nav class="navbar">
-    <div class="navbar-brand"><span>🚐</span> Transporte Social</div>
-    <div class="navbar-usuario">
-      <span id="nav-nome" class="nav-nome"></span>
-      <span id="nav-badge" class="badge"></span>
-      <button class="btn btn-outline-claro btn-sm" id="btn-conta">Minha conta</button>
-      <button class="btn btn-outline-claro btn-sm" id="btn-sair">Sair</button>
-    </div>
-  </nav>
-
-  <main class="container">
-
-    <!-- Situação do cadastro (RF03, RF04, RN04) -->
-    <div id="aviso-cadastro" class="hidden"></div>
-
-    <!-- ===================== CIDADÃO ===================== -->
-    <div id="painel-cidadao" class="hidden">
-
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-valor" id="stat-restantes">-</div>
-          <div class="stat-label">Viagens restantes nesta semana</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-valor" id="stat-limite">5</div>
-          <div class="stat-label">Limite semanal (segunda a domingo)</div>
+    <aside class="lateral">
+      <div class="logo"><img src="img/logo.png" alt="" class="logo-img" />Transporte Social</div>
+      <nav id="menu" class="menu"></nav>
+      <div class="perfil">
+        <div class="avatar" id="perfil-avatar"></div>
+        <div class="perfil-texto">
+          <strong id="perfil-nome"></strong>
+          <small id="perfil-tipo"></small>
         </div>
       </div>
+    </aside>
 
-      <!-- RF07 / RF08 -->
-      <div class="card">
-        <div class="card-header"><h3>🗺️ Solicitar viagem</h3></div>
-        <form id="form-solicitar" novalidate>
-          <div class="grid-2">
-            <div class="campo">
-              <label for="sol-origem">Origem</label>
-              <input id="sol-origem" type="text" maxlength="200" placeholder="Rua, número, bairro" />
-            </div>
-            <div class="campo">
-              <label for="sol-destino">Destino</label>
-              <input id="sol-destino" type="text" maxlength="200" placeholder="Ex.: Posto de saúde central" />
-            </div>
-          </div>
-          <div class="grid-2">
-            <div class="campo">
-              <label for="sol-km">Distância estimada (km)</label>
-              <input id="sol-km" type="number" step="0.1" min="0.1" max="200" placeholder="5.0" />
-            </div>
-            <div class="campo">
-              <label for="sol-menores">Menores acompanhantes (RN02)</label>
-              <input id="sol-menores" type="number" min="0" step="1" value="0" />
-            </div>
-          </div>
-          <div id="sol-preview" class="preview-valores hidden">
-            <div><span>Valor total</span><strong id="sol-total"></strong></div>
-            <div><span>Prefeitura paga</span><strong id="sol-subsidio"></strong></div>
-            <div><span>Você paga</span><strong id="sol-paga" class="destaque"></strong></div>
-            <div><span>Tempo estimado</span><strong id="sol-tempo"></strong></div>
-          </div>
-          <div id="sol-msg" class="alerta hidden"></div>
-          <div class="campo-acoes">
-            <button type="button" class="btn btn-secondary" id="btn-calcular">Calcular valor</button>
-            <button type="submit" class="btn btn-primary" id="btn-confirmar" disabled>Confirmar solicitação</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- RF10 / RF11 / RF13 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🧾 Minhas viagens</h3>
-          <button class="btn btn-outline btn-sm" id="btn-atualizar-cidadao">↻ Atualizar</button>
-        </div>
-        <div id="lista-viagens-cidadao" class="lista"><p class="vazio">Carregando...</p></div>
-      </div>
-    </div>
-
-    <!-- ===================== MOTORISTA ===================== -->
-    <div id="painel-motorista" class="hidden">
-
-      <!-- RF06 -->
-      <div class="card card-horizontal" id="card-disponibilidade">
+    <main class="conteudo">
+      <div class="topo">
         <div>
-          <h3>Disponibilidade</h3>
-          <p id="txt-disponivel" class="subtexto"></p>
+          <h2 id="saudacao"></h2>
+          <p id="subtitulo"></p>
         </div>
-        <label class="toggle" title="Disponível / indisponível">
-          <input type="checkbox" id="chk-disponivel" />
-          <span class="slider"></span>
-        </label>
+        <span id="tag-situacao" class="tag"></span>
       </div>
 
-      <!-- RF05 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🚗 Meus veículos</h3>
-          <button class="btn btn-outline btn-sm" id="btn-novo-veiculo">+ Adicionar</button>
-        </div>
-        <div id="lista-veiculos" class="lista"></div>
-      </div>
+      <!-- Situação do cadastro (RF03, RF04, RN04) -->
+      <div id="aviso-cadastro" class="hidden"></div>
 
-      <!-- RF09 -->
-      <div class="card" id="card-abertas">
-        <div class="card-header">
-          <h3>📋 Solicitações em aberto</h3>
-          <button class="btn btn-outline btn-sm" id="btn-atualizar-abertas">↻ Atualizar</button>
-        </div>
-        <div id="lista-abertas" class="lista"></div>
-      </div>
+      <!-- ===================== CIDADÃO ===================== -->
+      <div id="painel-cidadao" class="hidden">
 
-      <!-- RF13 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🧾 Minhas corridas</h3>
-          <button class="btn btn-outline btn-sm" id="btn-atualizar-motorista">↻ Atualizar</button>
-        </div>
-        <div id="lista-viagens-motorista" class="lista"></div>
-      </div>
-    </div>
-
-    <!-- ===================== ADMINISTRADOR ===================== -->
-    <div id="painel-admin" class="hidden">
-
-      <div class="tabs">
-        <button class="tab ativo" data-tab="tab-pendentes">⏳ Cadastros pendentes</button>
-        <button class="tab" data-tab="tab-usuarios">👥 Usuários</button>
-        <button class="tab" data-tab="tab-relatorio">📊 Relatório</button>
-      </div>
-
-      <!-- RF03 -->
-      <div id="tab-pendentes" class="tab-conteudo">
-        <div class="card">
-          <div class="card-header">
-            <h3>Cadastros aguardando análise</h3>
-            <button class="btn btn-outline btn-sm" id="btn-atualizar-pendentes">↻ Atualizar</button>
+        <div class="grid g-3 bloco-kpi">
+          <div class="card kpi">
+            <div class="anel" id="anel-restantes"><span id="stat-restantes">-</span></div>
+            <div><small>Viagens restantes</small><div class="num"><span id="stat-restantes-txt">-</span> de <span id="stat-limite">5</span></div><small>Semana de segunda a domingo</small></div>
           </div>
-          <div id="lista-pendentes" class="lista"></div>
-        </div>
-      </div>
-
-      <!-- RF01 (consultar) -->
-      <div id="tab-usuarios" class="tab-conteudo hidden">
-        <div class="card">
-          <div class="card-header"><h3>Consultar usuários</h3></div>
-          <div class="grid-3 filtros">
-            <div class="campo">
-              <label for="filtro-tipo">Tipo</label>
-              <select id="filtro-tipo">
-                <option value="">Todos</option>
-                <option value="CIDADAO">Cidadão</option>
-                <option value="MOTORISTA">Motorista</option>
-              </select>
-            </div>
-            <div class="campo">
-              <label for="filtro-status">Situação</label>
-              <select id="filtro-status">
-                <option value="">Todas</option>
-                <option value="PENDENTE">Pendente</option>
-                <option value="APROVADO">Aprovado</option>
-                <option value="RECUSADO">Recusado</option>
-              </select>
-            </div>
-            <div class="campo campo-botao">
-              <button class="btn btn-primary btn-block" id="btn-filtrar">Consultar</button>
-            </div>
+          <div class="card kpi">
+            <div class="icone-kpi">🚗</div>
+            <div><small>Viagem atual</small><div class="num num-texto" id="kpi-atual">Nenhuma</div><small id="kpi-atual-sub">Solicite uma viagem ao lado</small></div>
           </div>
-          <div id="lista-usuarios" class="lista"></div>
+          <div class="card kpi">
+            <div class="icone-kpi">$</div>
+            <div><small>Subsídio da prefeitura</small><div class="num num-texto">50%</div><small>Teto de R$ 15,00 por viagem</small></div>
+          </div>
+        </div>
+
+        <div class="grid g-2">
+          <!-- RF07 / RF08 -->
+          <div class="card" id="card-solicitar">
+            <h3>Solicitar viagem</h3>
+            <form id="form-solicitar" novalidate>
+              <div class="rota">
+                <span class="ponto p1"></span>
+                <div class="campo">
+                  <label for="sol-origem">Origem</label>
+                  <input id="sol-origem" type="text" maxlength="200" placeholder="Rua, número, bairro" />
+                </div>
+                <span class="ponto p2"></span>
+                <div class="campo">
+                  <label for="sol-destino">Destino</label>
+                  <input id="sol-destino" type="text" maxlength="200" placeholder="Ex.: Posto de saúde central" />
+                </div>
+              </div>
+              <div class="grid-2">
+                <div class="campo">
+                  <label for="sol-km">Distância estimada (km)</label>
+                  <input id="sol-km" type="number" step="0.1" min="0.1" max="200" placeholder="5.0" />
+                </div>
+                <div class="campo">
+                  <label for="sol-menores">Menores acompanhantes</label>
+                  <input id="sol-menores" type="number" min="0" step="1" value="0" />
+                </div>
+              </div>
+              <div id="sol-preview" class="valores hidden">
+                <div class="leg"><span>Valor total</span><b id="sol-total"></b></div>
+                <div class="barra"><div class="barra-pref" id="sol-barra"></div></div>
+                <div class="leg">
+                  <span>🏛️ Prefeitura paga<br /><b id="sol-subsidio"></b></span>
+                  <span class="voce">Você paga<br /><b id="sol-paga"></b></span>
+                </div>
+                <div class="leg leg-tempo"><span>Tempo estimado</span><b id="sol-tempo"></b></div>
+              </div>
+              <div id="sol-msg" class="alerta hidden"></div>
+              <div class="campo-acoes">
+                <button type="button" class="btn btn-secondary" id="btn-calcular">Calcular valor</button>
+                <button type="submit" class="btn btn-primary" id="btn-confirmar" disabled>Confirmar solicitação</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- RF10 -->
+          <div class="card" id="card-atual">
+            <h3>Viagem em andamento <span id="tag-atual" class="tag hidden"></span></h3>
+            <div id="viagem-atual"><p class="vazio">Nenhuma viagem em andamento.</p></div>
+          </div>
+        </div>
+
+        <!-- RF11 / RF13 -->
+        <div class="card" id="card-historico">
+          <h3>Histórico de viagens <button class="btn btn-outline btn-sm" id="btn-atualizar-cidadao">↻ Atualizar</button></h3>
+          <div id="lista-viagens-cidadao" class="lista"><p class="vazio">Carregando...</p></div>
         </div>
       </div>
 
-      <!-- RF14 -->
-      <div id="tab-relatorio" class="tab-conteudo hidden">
-        <div class="card">
-          <div class="card-header"><h3>Relatório de viagens e subsídios</h3></div>
-          <form id="form-relatorio" class="grid-3 filtros" novalidate>
-            <div class="campo">
-              <label for="rel-inicio">Data inicial</label>
-              <input id="rel-inicio" type="date" />
-            </div>
-            <div class="campo">
-              <label for="rel-fim">Data final</label>
-              <input id="rel-fim" type="date" />
-            </div>
-            <div class="campo campo-botao">
-              <button type="submit" class="btn btn-primary btn-block">Gerar relatório</button>
-            </div>
-          </form>
-          <div id="rel-msg" class="alerta hidden"></div>
-          <div id="rel-resultado"></div>
+      <!-- ===================== MOTORISTA ===================== -->
+      <div id="painel-motorista" class="hidden">
+
+        <!-- RF06 -->
+        <div class="card disp" id="card-disponibilidade">
+          <div>
+            <h3 id="titulo-disponivel">Disponibilidade</h3>
+            <p id="txt-disponivel" class="subtexto"></p>
+          </div>
+          <label class="toggle" title="Disponível / indisponível">
+            <input type="checkbox" id="chk-disponivel" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="grid g-2">
+          <!-- RF09 -->
+          <div class="card" id="card-abertas">
+            <h3>Solicitações em aberto <button class="btn btn-outline btn-sm" id="btn-atualizar-abertas">↻ Atualizar</button></h3>
+            <div id="lista-abertas" class="lista"></div>
+          </div>
+
+          <!-- RF05 -->
+          <div class="card" id="card-veiculos">
+            <h3>Meus veículos <button class="btn btn-outline btn-sm" id="btn-novo-veiculo">+ Adicionar</button></h3>
+            <div id="lista-veiculos" class="lista"></div>
+          </div>
+        </div>
+
+        <!-- RF13 -->
+        <div class="card" id="card-corridas">
+          <h3>Minhas corridas <button class="btn btn-outline btn-sm" id="btn-atualizar-motorista">↻ Atualizar</button></h3>
+          <div id="lista-viagens-motorista" class="lista"></div>
         </div>
       </div>
-    </div>
 
-  </main>
+      <!-- ===================== ADMINISTRADOR ===================== -->
+      <div id="painel-admin" class="hidden">
+
+        <div class="grid g-3 bloco-kpi">
+          <div class="card kpi"><div class="icone-kpi icone-amarelo">⏳</div><div><small>Cadastros pendentes</small><div class="num" id="kpi-pendentes">-</div></div></div>
+          <div class="card kpi"><div class="icone-kpi">🚐</div><div><small>Viagens realizadas no mês</small><div class="num" id="kpi-viagens-mes">-</div></div></div>
+          <div class="card kpi"><div class="icone-kpi">R$</div><div><small>Subsídio pago no mês</small><div class="num num-texto" id="kpi-subsidio-mes">-</div></div></div>
+        </div>
+
+        <!-- RF03 -->
+        <div id="tab-pendentes" class="tab-conteudo">
+          <div class="card">
+            <h3>Cadastros aguardando análise <button class="btn btn-outline btn-sm" id="btn-atualizar-pendentes">↻ Atualizar</button></h3>
+            <div id="lista-pendentes" class="lista"></div>
+          </div>
+        </div>
+
+        <!-- RF01 (consultar) -->
+        <div id="tab-usuarios" class="tab-conteudo hidden">
+          <div class="card">
+            <h3>Consultar usuários</h3>
+            <div class="grid-3 filtros">
+              <div class="campo">
+                <label for="filtro-tipo">Tipo</label>
+                <select id="filtro-tipo">
+                  <option value="">Todos</option>
+                  <option value="CIDADAO">Cidadão</option>
+                  <option value="MOTORISTA">Motorista</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="filtro-status">Situação</label>
+                <select id="filtro-status">
+                  <option value="">Todas</option>
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="APROVADO">Aprovado</option>
+                  <option value="RECUSADO">Recusado</option>
+                </select>
+              </div>
+              <div class="campo campo-botao">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary btn-block" id="btn-filtrar">Consultar</button>
+              </div>
+            </div>
+            <div id="lista-usuarios" class="lista"></div>
+          </div>
+        </div>
+
+        <!-- RF14 -->
+        <div id="tab-relatorio" class="tab-conteudo hidden">
+          <div class="card">
+            <h3>Relatório de viagens e subsídios</h3>
+            <form id="form-relatorio" class="grid-3 filtros" novalidate>
+              <div class="campo">
+                <label for="rel-inicio">Data inicial</label>
+                <input id="rel-inicio" type="date" />
+              </div>
+              <div class="campo">
+                <label for="rel-fim">Data final</label>
+                <input id="rel-fim" type="date" />
+              </div>
+              <div class="campo campo-botao">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary btn-block">Gerar relatório</button>
+              </div>
+            </form>
+            <div id="rel-msg" class="alerta hidden"></div>
+            <div id="rel-resultado"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
 </section>
 
 <!-- =========================================================
